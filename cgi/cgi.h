@@ -51,11 +51,21 @@ struct ARGUMENT
 /*! @brief Holds the values parsed from the argument string. */
 struct ARGUMENT_DATA
 {
-	/*! @brief True if color images should be returned.*/
-	bool bDoCaptureColor;
-	/*! @brief Says whether the argument bDoDebayering has been
+	/*! @Shutter time in micro seconds.*/
+	int nExposureTime;
+	/*! @brief Says whether the argument ExposureTime has been
 	 * supplied or not. */
-	bool bDoCaptureColor_supplied;
+	bool bExposureTime_supplied;
+	/*! @brief cut off value for change detection.*/
+	int nThreshold;
+	/*! @brief Says whether the argument threshold has been
+	 * supplied or not. */
+	bool bThreshold_supplied;
+	/*! @brief index of image to be sent via cgi to webserver.*/
+	int nImageType;
+	/*! @brief Says whether the argument ImageType has been
+	 * supplied or not. */
+	bool bImageType_supplied;
 };
 
 /*! @brief Main object structure of the CGI. Contains all 'global'

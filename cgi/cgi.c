@@ -25,7 +25,9 @@ struct CGI_TEMPLATE cgi;
 /*! @brief All potential arguments supplied to this CGI. */
 struct ARGUMENT args[] =
 {
-	{ "DoCaptureColor", BOOL_ARG, &cgi.args.bDoCaptureColor, &cgi.args.bDoCaptureColor_supplied }
+	{ "exposureTime", INT_ARG, &cgi.args.nExposureTime, &cgi.args.bExposureTime_supplied },
+	{ "Threshold", INT_ARG, &cgi.args.nThreshold, &cgi.args.bThreshold_supplied },
+	{ "ImageType", INT_ARG, &cgi.args.nImageType, &cgi.args.bImageType_supplied }
 };
 
 /*! @brief Strips whiltespace from the beginning and the end of a string and returns the new beginning of the string. Be advised, that the original string gets mangled! */
@@ -60,7 +62,9 @@ static OSC_ERR CGIParseArguments()
 
 	/* Intialize all arguments as 'not supplied' */
 	for (int i = 0; i < sizeof args / sizeof (struct ARGUMENT); i += 1)
+	{
 		*args[i].pbSupplied = false;
+	}
 
 	while (fgets (buffer, sizeof buffer, stdin)) {
 		struct ARGUMENT *pArg = NULL;
@@ -76,6 +80,8 @@ static OSC_ERR CGIParseArguments()
 
 		key = strtrim(buffer);
 		value = strtrim(value);
+
+		OscLog(INFO, "obtained key: %s, and Value: %s\n", key, value);
 
 		for (int i = 0; i < sizeof(args)/sizeof(struct ARGUMENT); i += 1) {
 			if (strcmp(args[i].strName, key) == 0) {
@@ -148,14 +154,11 @@ static OSC_ERR QueryApp()
 	case APP_OFF:
 		/* Algorithm is off, nothing else to do. */
 		break;
-	case APP_CAPTURE_COLOR:
+	case APP_CAPTURE_ON:
 		if (cgi.appState.bNewImageReady)
 		{
 			/* If there is a new image ready, request it from the application. */
-			err = OscIpcGetParam(cgi.ipcChan,
-					cgi.imgBuf,
-					GET_COLOR_IMG,
-					3*OSC_CAM_MAX_IMAGE_WIDTH*OSC_CAM_MAX_IMAGE_HEIGHT);
+			err = OscIpcGetParam(cgi.ipcChan, cgi.imgBuf, GET_NEW_IMG, OSC_CAM_MAX_IMAGE_WIDTH/2*OSC_CAM_MAX_IMAGE_HEIGHT/2);
 			if (err != SUCCESS)
 			{
 				OscLog(DEBUG, "CGI: Getting new image failed! (%d)\n", err);
@@ -164,28 +167,8 @@ static OSC_ERR QueryApp()
 
 			/* Write the image to the RAM file system where it can be picked
 			 * up by the webserver on request from the browser. */
-			pic.width = OSC_CAM_MAX_IMAGE_WIDTH;
-			pic.height = OSC_CAM_MAX_IMAGE_HEIGHT;
-			pic.type = OSC_PICTURE_BGR_24;
-			pic.data = (void*)cgi.imgBuf;
-
-			return OscBmpWrite(&pic, IMG_FN);
-		}
-		break;
-	case APP_CAPTURE_RAW:
-		if (cgi.appState.bNewImageReady)
-		{
-			/* If there is a new image ready, request it from the application. */
-			err = OscIpcGetParam(cgi.ipcChan, cgi.imgBuf, GET_RAW_IMG, OSC_CAM_MAX_IMAGE_WIDTH*OSC_CAM_MAX_IMAGE_HEIGHT);
-			if (err != SUCCESS)
-			{
-				OscLog(DEBUG, "CGI: Getting new image failed! (%d)\n", err);
-				return err;
-			}
-
-			/* Write the image to the RAM file system where it can be picked up by the webserver on request from the browser. */
-			pic.width = OSC_CAM_MAX_IMAGE_WIDTH;
-			pic.height = OSC_CAM_MAX_IMAGE_HEIGHT;
+			pic.width = OSC_CAM_MAX_IMAGE_WIDTH/2;
+			pic.height = OSC_CAM_MAX_IMAGE_HEIGHT/2;
 			pic.type = OSC_PICTURE_GREYSCALE;
 			pic.data = (void*)cgi.imgBuf;
 
@@ -210,9 +193,29 @@ static OSC_ERR SetOptions()
 	OSC_ERR err;
 	struct ARGUMENT_DATA *pArgs = &cgi.args;
 
-	if (pArgs->bDoCaptureColor_supplied)
+	if (pArgs->bImageType_supplied)
 	{
-		err = OscIpcSetParam(cgi.ipcChan, &pArgs->bDoCaptureColor, SET_CAPTURE_MODE, sizeof(pArgs->bDoCaptureColor));
+		err = OscIpcSetParam(cgi.ipcChan, &pArgs->nImageType, SET_IMAGE_TYPE, sizeof(pArgs->nImageType));
+		if (err != SUCCESS)
+		{
+			OscLog(DEBUG, "CGI: Error setting option! (%d)\n", err);
+			return err;
+		}
+	}
+
+	if (pArgs->bThreshold_supplied)
+	{
+		err = OscIpcSetParam(cgi.ipcChan, &pArgs->nThreshold, SET_THRESHOLD, sizeof(pArgs->nThreshold));
+		if (err != SUCCESS)
+		{
+			OscLog(DEBUG, "CGI: Error setting option! (%d)\n", err);
+			return err;
+		}
+	}
+
+	if (pArgs->bExposureTime_supplied)
+	{
+		err = OscIpcSetParam(cgi.ipcChan, &pArgs->nExposureTime, SET_EXPOSURE_TIME, sizeof(pArgs->nExposureTime));
 		if (err != SUCCESS)
 		{
 			OscLog(DEBUG, "CGI: Error setting option! (%d)\n", err);
@@ -235,6 +238,12 @@ static void FormCGIResponse()
 	printf("Content-type: text/plain\n\n" );
 
 	printf("imgTS: %u\n", (unsigned int)pAppState->imageTimeStamp);
+	printf("exposureTime: %d\n", pAppState->nExposureTime);
+	printf("Threshold: %d\n", pAppState->nThreshold);
+	printf("Stepcounter: %d\n", pAppState->nStepCounter);
+	printf("width: %d\n", OSC_CAM_MAX_IMAGE_WIDTH/2);
+	printf("height: %d\n", OSC_CAM_MAX_IMAGE_HEIGHT/2);
+	printf("ImageType: %u\n", pAppState->nImageType);
 
 	fflush(stdout);
 }
