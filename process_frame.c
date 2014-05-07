@@ -23,6 +23,8 @@ OSC_ERR OscVisDrawBoundingBoxBW(struct OSC_PICTURE *picIn,
 		struct OSC_VIS_REGIONS *regions, uint8 Color, int MinSize);
 
 void ProcessFrame(uint8 *pInputImg) {
+	struct OSC_VIS_REGIONS regions;
+	struct OSC_PICTURE mypic1,mypic2,mypic3;
 	//initialize counters
 	if (data.ipc.state.nStepCounter == 1) {
 		OscInitChgDetection();
@@ -35,6 +37,28 @@ void ProcessFrame(uint8 *pInputImg) {
 	//do closing
 	OscDilation(THRESHOLD,BACKGROUND);
 	OscErosion(BACKGROUND,THRESHOLD);
+	//Wrapping
+	mypic1.data=data.u8TempImage[THRESHOLD];
+	mypic1.height=nr;
+	mypic1.width=nc;
+	mypic1.type=OSC_PICTURE_GREYSCALE;
+	//Wrapping
+	mypic3.data=data.u8TempImage[GRAYSCALE];
+	mypic3.height=nr;
+	mypic3.width=nc;
+	mypic3.type=OSC_PICTURE_GREYSCALE;
+	//Wrapping
+	mypic2.data=data.u8TempImage[BACKGROUND];
+	mypic2.height=nr;
+	mypic2.width=nc;
+	mypic2.type=OSC_PICTURE_GREYSCALE;
+	//Do Region Labeling
+	OscVisGrey2BW(&mypic1,&mypic2,100,0);
+	OscVisLabelBinary(&mypic2, &regions);
+	OscVisGetRegionProperties(&regions);
+	//Draw Bounding Box
+	OscVisDrawBoundingBoxBW(&mypic2, &regions, 255, 600);
+	OscVisDrawBoundingBoxBW(&mypic3, &regions, 255, 600);
 
 }
 
